@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Baza aut</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 12px; background:#111; color:#fff; }
+    h1 { text-align:center; }
+    input, button { width:100%; padding:10px; margin:5px 0; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th, td { border:1px solid #444; padding:6px; text-align:left; }
+    th { background:#222; }
+    tr:hover { background:#333; }
+    button { background:#2ecc71; border:none; font-weight:bold; }
+    .danger { background:#e74c3c; }
+  </style>
+</head>
+<body>
+
+<h1>🚗 Baza aut</h1>
+
+<input id="vin" placeholder="VIN">
+<input id="marka" placeholder="Marka">
+<input id="rocznik" placeholder="Rocznik">
+<input id="kolor" placeholder="Kod koloru">
+
+<button onclick="add()">Zapisz</button>
+
+<input id="search" placeholder="Szukaj..." oninput="render()">
+
+<table>
+  <thead>
+    <tr><th>VIN</th><th>Marka</th><th>Rok</th><th>Kod</th><th></th></tr>
+  </thead>
+  <tbody id="list"></tbody>
+</table>
+
+<script src="app.js"></script>
+</body>
+</html>
