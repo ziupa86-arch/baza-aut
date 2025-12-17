@@ -1,5 +1,5 @@
 /* sw.js - Car Database offline */
-const CACHE_NAME = "car-db-v5"; // <-- zwiększaj v6, v7... gdy aktualizujesz pliki
+const CACHE_NAME = "car-db-v6"; // <-- zwiększaj v6, v7... gdy aktualizujesz pliki
 const ASSETS = [
   "./",
   "./index.html",
