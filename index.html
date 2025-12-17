@@ -1,38 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Car Database – offline</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Car Database – Offline</title>
 
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#111111">
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111111">
 
-  <style>
-    body{margin:0;font-family:Arial;background:#111;color:#fff}
-    h1{text-align:center;margin:10px 0}
-    .box{padding:10px}
-    input,button{width:100%;padding:10px;margin:5px 0;font-size:16px}
-    button{background:#2ecc71;border:none;font-weight:bold;cursor:pointer}
-    .danger{background:#e74c3c}
-    .blue{background:#3b82f6}
-    .gray{background:#444}
-    table{width:100%;border-collapse:collapse;margin-top:10px}
-    th,td{border:1px solid #444;padding:6px;vertical-align:top}
-    th{background:#222}
-    tr:hover{background:#333}
-    .row{display:flex;gap:8px;flex-wrap:wrap}
-    .row button{flex:1;min-width:160px}
-    .small{font-size:13px;color:#bbb;margin-top:6px}
-  </style>
+<style>
+body{
+  margin:0;
+  font-family:Arial,Helvetica,sans-serif;
+  background:#111;
+  color:#fff;
+}
+h1{
+  text-align:center;
+  margin:10px 0;
+}
+.container{
+  padding:10px;
+}
+input,button{
+  width:100%;
+  padding:10px;
+  margin:5px 0;
+  font-size:16px;
+}
+button{
+  background:#2ecc71;
+  border:none;
+  font-weight:bold;
+  cursor:pointer;
+}
+button.secondary{
+  background:#3498db;
+}
+button.danger{
+  background:#e74c3c;
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:10px;
+}
+th,td{
+  border:1px solid #444;
+  padding:6px;
+  text-align:left;
+}
+th{
+  background:#222;
+}
+tr:hover{
+  background:#333;
+}
+
+/* PRINT / PDF */
+@media print{
+  input,button{
+    display:none;
+  }
+  body{
+    background:#fff;
+    color:#000;
+  }
+  th,td{
+    border:1px solid #000;
+  }
+}
+</style>
 </head>
+
 <body>
 
 <h1>🚗 Car Database</h1>
 
-<div class="box">
+<div class="container">
 
-  <!-- 4 INPUT FIELDS -->
   <input id="make" placeholder="Make (e.g. BMW)">
   <input id="year" placeholder="Year (e.g. 2018)">
   <input id="camera" placeholder="Camera reading">
@@ -40,17 +87,10 @@
 
   <button onclick="add()">Save</button>
 
-  <input id="q" placeholder="Search..." oninput="render()">
+  <input id="search" placeholder="Search..." oninput="render()">
 
-  <!-- EXPORT + PRINT -->
-  <div class="row">
-    <button class="blue" onclick="exportCSV()">Export CSV</button>
-    <button class="blue" onclick="exportJSON()">Export JSON (backup)</button>
-    <button class="gray" onclick="printPDF()">Print / Save as PDF</button>
-  </div>
-  <div class="small">
-    Tip: For PDF choose printer: <b>Save as PDF</b> in the print window.
-  </div>
+  <button class="secondary" onclick="printPDF()">Print / PDF</button>
+  <button class="secondary" onclick="exportData()">Export data</button>
 
   <table>
     <thead>
@@ -64,212 +104,117 @@
     </thead>
     <tbody id="list"></tbody>
   </table>
+
 </div>
 
 <script>
-/* ===== DATABASE ===== */
-const KEY = "car_db_4fields_v2";
+/* ===== STORAGE ===== */
+const KEY = "car_database_offline";
+
 const load = () => JSON.parse(localStorage.getItem(KEY) || "[]");
 const save = d => localStorage.setItem(KEY, JSON.stringify(d));
 
-const U = v => (v||"").trim().toUpperCase();
-const T = v => (v||"").trim();
-const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const norm = v => (v || "").trim().toUpperCase();
 
 /* ===== ADD ===== */
 function add(){
-  const makeV   = U(makeI.value);
-  const yearV   = T(yearI.value);
-  const camV    = T(cameraI.value);
-  const colorV  = U(colorI.value);
+  const make = norm(makeI.value);
+  const year = yearI.value.trim();
+  const camera = norm(cameraI.value);
+  const color = norm(colorI.value);
 
-  if(!makeV || !yearV || !camV || !colorV){
-    alert("Please fill in all 4 fields");
+  if(!make || !year || !camera || !color){
+    alert("Fill all fields");
     return;
   }
 
-  const d = load();
-  d.unshift({ id: uid(), make: makeV, year: yearV, camera: camV, color: colorV });
-  save(d);
+  const data = load();
+  data.unshift({make,year,camera,color});
+  save(data);
 
   makeI.value = yearI.value = cameraI.value = colorI.value = "";
   render();
 }
 
-/* ===== DELETE / EDIT ===== */
-function del(id){
+/* ===== DELETE ===== */
+function del(i){
   if(!confirm("Delete entry?")) return;
-  save(load().filter(x => x.id !== id));
-  render();
-}
-
-function edit(id){
   const d = load();
-  const x = d.find(a => a.id === id);
-  if(!x) return;
-
-  const nm = U(prompt("Make", x.make));
-  const ny = prompt("Year", x.year);
-  const nc = prompt("Camera reading", x.camera);
-  const nk = U(prompt("Color code", x.color));
-
-  if(!nm || !ny || !nc || !nk) return;
-
-  Object.assign(x, { make: nm, year: ny.trim(), camera: nc.trim(), color: nk });
+  d.splice(i,1);
   save(d);
   render();
 }
 
-/* ===== FILTERED DATA (based on search box) ===== */
-function getFiltered(){
-  const q = U(qI.value);
-  const data = load();
-  if(!q) return data;
-  return data.filter(x => `${x.make} ${x.year} ${x.camera} ${x.color}`.includes(q));
+/* ===== EDIT ===== */
+function edit(i){
+  const d = load();
+  const x = d[i];
+  if(!x) return;
+
+  const make = norm(prompt("Make",x.make));
+  const year = prompt("Year",x.year);
+  const camera = norm(prompt("Camera reading",x.camera));
+  const color = norm(prompt("Color code",x.color));
+
+  if(!make || !year || !camera || !color) return;
+
+  d[i] = {make,year,camera,color};
+  save(d);
+  render();
 }
 
 /* ===== RENDER ===== */
 function render(){
-  const data = getFiltered();
+  const q = norm(searchI.value);
   list.innerHTML = "";
-  data.forEach(x => {
+
+  load().forEach((x,i)=>{
+    const txt = `${x.make} ${x.year} ${x.camera} ${x.color}`;
+    if(q && !txt.includes(q)) return;
+
     list.innerHTML += `
       <tr>
-        <td>${escapeHtml(x.make)}</td>
-        <td>${escapeHtml(x.year)}</td>
-        <td>${escapeHtml(x.camera)}</td>
-        <td>${escapeHtml(x.color)}</td>
+        <td>${x.make}</td>
+        <td>${x.year}</td>
+        <td>${x.camera}</td>
+        <td>${x.color}</td>
         <td>
-          <button onclick="edit('${x.id}')">Edit</button>
-          <button class="danger" onclick="del('${x.id}')">Delete</button>
+          <button onclick="edit(${i})">Edit</button>
+          <button class="danger" onclick="del(${i})">Delete</button>
         </td>
       </tr>`;
   });
 }
 
-/* ===== EXPORT CSV ===== */
-function exportCSV(){
-  const data = getFiltered();
-  if(data.length === 0) return alert("Nothing to export.");
-
-  const header = ["Make","Year","Camera reading","Color code"];
-  const lines = [header.join(",")];
-
-  data.forEach(x => {
-    lines.push([
-      csvCell(x.make),
-      csvCell(x.year),
-      csvCell(x.camera),
-      csvCell(x.color)
-    ].join(","));
-  });
-
-  const csv = lines.join("\n");
-  downloadFile(csv, fileName("car-database", "csv"), "text/csv;charset=utf-8");
-}
-
-/* ===== EXPORT JSON (backup) ===== */
-function exportJSON(){
-  const data = getFiltered();
-  if(data.length === 0) return alert("Nothing to export.");
-
-  const json = JSON.stringify(data, null, 2);
-  downloadFile(json, fileName("car-database-backup", "json"), "application/json;charset=utf-8");
-}
-
-/* ===== PRINT / SAVE AS PDF ===== */
+/* ===== PDF ===== */
 function printPDF(){
-  const data = getFiltered();
-
-  const rows = data.map(x => `
-    <tr>
-      <td>${escapeHtml(x.make)}</td>
-      <td>${escapeHtml(x.year)}</td>
-      <td>${escapeHtml(x.camera)}</td>
-      <td>${escapeHtml(x.color)}</td>
-    </tr>`).join("");
-
-  const html = `
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <meta charset="utf-8">
-    <title>Car Database - Print</title>
-    <style>
-      body{font-family:Arial;margin:24px;color:#111}
-      h2{margin:0 0 10px 0}
-      .meta{color:#555;margin-bottom:14px;font-size:12px}
-      table{width:100%;border-collapse:collapse}
-      th,td{border:1px solid #999;padding:8px;text-align:left;vertical-align:top}
-      th{background:#eee}
-      @page { margin: 14mm; }
-    </style>
-  </head>
-  <body>
-    <h2>Car Database</h2>
-    <div class="meta">
-      Exported: ${new Date().toLocaleString()}<br>
-      Search filter: ${escapeHtml(qI.value || "(none)")}
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Make</th><th>Year</th><th>Camera reading</th><th>Color code</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows || `<tr><td colspan="4">No records</td></tr>`}
-      </tbody>
-    </table>
-    <script>
-      window.onload = () => window.print();
-    <\/script>
-  </body>
-  </html>`;
-
-  const w = window.open("", "_blank");
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  window.print();
 }
 
-/* ===== HELPERS ===== */
-function downloadFile(content, filename, mime){
-  const blob = new Blob([content], {type: mime});
+/* ===== EXPORT ===== */
+function exportData(){
+  const data = localStorage.getItem(KEY);
+  if(!data) return alert("No data");
+
+  const blob = new Blob([data], {type:"application/json"});
   const url = URL.createObjectURL(blob);
+
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
+  a.download = "car_database_backup.json";
   a.click();
-  a.remove();
+
   URL.revokeObjectURL(url);
 }
 
-function fileName(base, ext){
-  const d = new Date();
-  const pad = n => String(n).padStart(2,"0");
-  const stamp = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
-  return `${base}_${stamp}.${ext}`;
-}
+/* ===== INIT ===== */
+const makeI = document.getElementById("make");
+const yearI = document.getElementById("year");
+const cameraI = document.getElementById("camera");
+const colorI = document.getElementById("color");
+const searchI = document.getElementById("search");
+const list = document.getElementById("list");
 
-function csvCell(v){
-  const s = String(v ?? "");
-  // Escape quotes and wrap in quotes
-  return `"${s.replace(/"/g,'""')}"`;
-}
-
-function escapeHtml(str){
-  return String(str ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-
-/* ===== START ===== */
-const makeI = make, yearI = year, cameraI = camera, colorI = color, qI = q;
 render();
 
 /* ===== OFFLINE ===== */
