@@ -1,227 +1,361 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Car Database – Offline</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Car Database – offline</title>
 
-<!-- PWA -->
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#111111">
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#111111">
 
-<style>
-body{
-  margin:0;
-  font-family:Arial,Helvetica,sans-serif;
-  background:#111;
-  color:#fff;
-}
-h1{
-  text-align:center;
-  margin:10px 0;
-}
-.container{
-  padding:10px;
-}
-input,button{
-  width:100%;
-  padding:10px;
-  margin:5px 0;
-  font-size:16px;
-}
-button{
-  background:#2ecc71;
-  border:none;
-  font-weight:bold;
-  cursor:pointer;
-}
-button.secondary{
-  background:#3498db;
-}
-button.danger{
-  background:#e74c3c;
-}
-table{
-  width:100%;
-  border-collapse:collapse;
-  margin-top:10px;
-}
-th,td{
-  border:1px solid #444;
-  padding:6px;
-  text-align:left;
-}
-th{
-  background:#222;
-}
-tr:hover{
-  background:#333;
-}
+  <style>
+    :root{
+      --bg:#111; --panel:#181818; --line:#2a2a2a; --text:#fff;
+      --muted:#cfcfcf; --accent:#2ecc71; --danger:#e74c3c;
+    }
+    body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
+    header{padding:14px 10px;text-align:center;font-weight:700;font-size:22px;background:#0f0f0f;border-bottom:1px solid var(--line)}
+    header span{font-size:20px;margin-right:6px}
+    .wrap{max-width:1100px;margin:0 auto;padding:10px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    @media (max-width:900px){ .grid{grid-template-columns:repeat(2,1fr);} }
+    @media (max-width:520px){ .grid{grid-template-columns:1fr;} }
 
-/* PRINT / PDF */
-@media print{
-  input,button{
-    display:none;
-  }
-  body{
-    background:#fff;
-    color:#000;
-  }
-  th,td{
-    border:1px solid #000;
-  }
-}
-</style>
+    input,button{width:100%;box-sizing:border-box;padding:10px;font-size:16px;border-radius:8px;border:1px solid #3a3a3a}
+    input{background:#f3f3f3;color:#111}
+    input::placeholder{color:#666}
+    .row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+    .row > *{flex:1}
+    button{cursor:pointer;border:none;font-weight:700}
+    .btn-save{background:var(--accent);color:#0a0a0a}
+    .btn-ghost{background:#2a2a2a;color:#fff;border:1px solid #3a3a3a}
+    .btn-danger{background:var(--danger);color:#fff}
+    .hint{color:var(--muted);font-size:13px;margin-top:6px}
+    .search{margin-top:10px}
+
+    table{width:100%;border-collapse:collapse;margin-top:10px;background:#141414}
+    th,td{border:1px solid #333;padding:8px;text-align:left}
+    th{background:#202020}
+    tr:hover{background:#1b1b1b}
+
+    .actionBtns{display:flex;gap:6px}
+    .actionBtns button{padding:8px 10px;font-size:14px;border-radius:8px}
+    .small{font-size:12px;color:#bdbdbd;margin-top:6px}
+    .topbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .topbar > *{flex:1}
+  </style>
 </head>
 
 <body>
+  <header><span>🚗</span>Car Database</header>
 
-<h1>🚗 Car Database</h1>
+  <div class="wrap">
+    <div class="card">
 
-<div class="container">
+      <div class="grid">
+        <input id="make" placeholder="Make (e.g. BMW)">
+        <input id="year" placeholder="Year (e.g. 2018)" inputmode="numeric">
+        <input id="camera" placeholder="Camera reading (free text)">
+        <input id="color" placeholder="Color code (e.g. A52)">
+      </div>
 
-  <input id="make" placeholder="Make (e.g. BMW)">
-  <input id="year" placeholder="Year (e.g. 2018)">
-  <input id="camera" placeholder="Camera reading">
-  <input id="color" placeholder="Color code (e.g. A52)">
+      <div class="row">
+        <button class="btn-save" id="btnSave">Save</button>
+        <button class="btn-ghost" id="btnClear">Clear form</button>
+      </div>
 
-  <button onclick="add()">Save</button>
+      <div class="topbar">
+        <input class="search" id="q" placeholder="Search... (make / year / camera / color)">
+        <button class="btn-ghost" id="btnExportCsv">Export CSV</button>
+        <button class="btn-ghost" id="btnExportJson">Export JSON</button>
+        <button class="btn-ghost" id="btnImportJson">Import JSON</button>
+        <button class="btn-ghost" id="btnPrint">Print / Save as PDF</button>
+      </div>
 
-  <input id="search" placeholder="Search..." oninput="render()">
+      <div class="hint">
+        Data is stored locally in this browser (offline). To make PDF: click <b>Print / Save as PDF</b> and choose “Save as PDF”.
+      </div>
+      <div class="small" id="stats"></div>
 
-  <button class="secondary" onclick="printPDF()">Print / PDF</button>
-  <button class="secondary" onclick="exportData()">Export data</button>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:22%">Make</th>
+            <th style="width:10%">Year</th>
+            <th>Camera reading</th>
+            <th style="width:16%">Color code</th>
+            <th style="width:18%">Action</th>
+          </tr>
+        </thead>
+        <tbody id="list"></tbody>
+      </table>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Make</th>
-        <th>Year</th>
-        <th>Camera reading</th>
-        <th>Color code</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody id="list"></tbody>
-  </table>
-
-</div>
+    </div>
+  </div>
 
 <script>
-/* ===== STORAGE ===== */
-const KEY = "car_database_offline";
+/* ===== Car Database (offline) ===== */
+const KEY = "car_db_v1";
 
-const load = () => JSON.parse(localStorage.getItem(KEY) || "[]");
-const save = d => localStorage.setItem(KEY, JSON.stringify(d));
+const $ = (id) => document.getElementById(id);
 
-const norm = v => (v || "").trim().toUpperCase();
+const normalize = (v) => (v ?? "").toString().trim();
+const normUpper = (v) => normalize(v).toUpperCase();
 
-/* ===== ADD ===== */
-function add(){
-  const make = norm(makeI.value);
-  const year = yearI.value.trim();
-  const camera = norm(cameraI.value);
-  const color = norm(colorI.value);
+const load = () => {
+  try { return JSON.parse(localStorage.getItem(KEY) || "[]"); }
+  catch { return []; }
+};
 
-  if(!make || !year || !camera || !color){
-    alert("Fill all fields");
+const saveAll = (arr) => localStorage.setItem(KEY, JSON.stringify(arr));
+
+function getForm() {
+  return {
+    make: normUpper($("make").value),
+    year: normalize($("year").value),
+    camera: normalize($("camera").value),
+    color: normUpper($("color").value),
+  };
+}
+
+function clearForm() {
+  $("make").value = "";
+  $("year").value = "";
+  $("camera").value = "";
+  $("color").value = "";
+  $("make").focus();
+}
+
+function validate(entry){
+  if(!entry.make || !entry.year || !entry.camera || !entry.color){
+    alert("Fill all 4 fields.");
+    return false;
+  }
+  // optional: simple year check
+  if(!/^\d{4}$/.test(entry.year)){
+    if(!confirm("Year is not 4 digits. Save anyway?")) return false;
+  }
+  return true;
+}
+
+function addEntry(){
+  const entry = getForm();
+  if(!validate(entry)) return;
+
+  const arr = load();
+  // prevent duplicates (same Make+Year+Color+Camera)
+  const sig = `${entry.make}|${entry.year}|${entry.camera}|${entry.color}`;
+  if(arr.some(x => `${x.make}|${x.year}|${x.camera}|${x.color}` === sig)){
+    alert("This exact record already exists.");
     return;
   }
 
-  const data = load();
-  data.unshift({make,year,camera,color});
-  save(data);
-
-  makeI.value = yearI.value = cameraI.value = colorI.value = "";
+  arr.unshift({ ...entry, createdAt: new Date().toISOString() });
+  saveAll(arr);
+  clearForm();
   render();
 }
 
-/* ===== DELETE ===== */
-function del(i){
-  if(!confirm("Delete entry?")) return;
-  const d = load();
-  d.splice(i,1);
-  save(d);
+function delEntry(idx){
+  const arr = load();
+  if(!arr[idx]) return;
+  if(!confirm("Delete this record?")) return;
+  arr.splice(idx, 1);
+  saveAll(arr);
   render();
 }
 
-/* ===== EDIT ===== */
-function edit(i){
-  const d = load();
-  const x = d[i];
+function editEntry(idx){
+  const arr = load();
+  const x = arr[idx];
   if(!x) return;
 
-  const make = norm(prompt("Make",x.make));
-  const year = prompt("Year",x.year);
-  const camera = norm(prompt("Camera reading",x.camera));
-  const color = norm(prompt("Color code",x.color));
+  const make = normUpper(prompt("Make:", x.make));
+  if(!make) return;
 
-  if(!make || !year || !camera || !color) return;
+  const year = normalize(prompt("Year:", x.year));
+  if(!year) return;
 
-  d[i] = {make,year,camera,color};
-  save(d);
+  const camera = normalize(prompt("Camera reading:", x.camera));
+  if(!camera) return;
+
+  const color = normUpper(prompt("Color code:", x.color));
+  if(!color) return;
+
+  const updated = { ...x, make, year, camera, color };
+  if(!validate(updated)) return;
+
+  arr[idx] = updated;
+  saveAll(arr);
   render();
 }
 
-/* ===== RENDER ===== */
 function render(){
-  const q = norm(searchI.value);
-  list.innerHTML = "";
+  const q = normUpper($("q").value);
+  const arr = load();
 
-  load().forEach((x,i)=>{
-    const txt = `${x.make} ${x.year} ${x.camera} ${x.color}`;
-    if(q && !txt.includes(q)) return;
+  $("stats").textContent = `Records: ${arr.length}`;
 
-    list.innerHTML += `
+  const rows = [];
+  arr.forEach((x, idx) => {
+    const hay = `${x.make} ${x.year} ${x.camera} ${x.color}`.toUpperCase();
+    if(q && !hay.includes(q)) return;
+
+    rows.push(`
       <tr>
-        <td>${x.make}</td>
-        <td>${x.year}</td>
-        <td>${x.camera}</td>
-        <td>${x.color}</td>
+        <td>${escapeHtml(x.make)}</td>
+        <td>${escapeHtml(x.year)}</td>
+        <td>${escapeHtml(x.camera)}</td>
+        <td>${escapeHtml(x.color)}</td>
         <td>
-          <button onclick="edit(${i})">Edit</button>
-          <button class="danger" onclick="del(${i})">Delete</button>
+          <div class="actionBtns">
+            <button class="btn-ghost" onclick="editEntry(${idx})">Edit</button>
+            <button class="btn-danger" onclick="delEntry(${idx})">Delete</button>
+          </div>
         </td>
-      </tr>`;
+      </tr>
+    `);
   });
+
+  $("list").innerHTML = rows.join("");
 }
 
-/* ===== PDF ===== */
-function printPDF(){
-  window.print();
+function escapeHtml(s){
+  return (s ?? "").toString()
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
 }
 
-/* ===== EXPORT ===== */
-function exportData(){
-  const data = localStorage.getItem(KEY);
-  if(!data) return alert("No data");
-
-  const blob = new Blob([data], {type:"application/json"});
+/* ===== Export / Import ===== */
+function downloadBlob(blob, filename){
   const url = URL.createObjectURL(blob);
-
   const a = document.createElement("a");
   a.href = url;
-  a.download = "car_database_backup.json";
+  a.download = filename;
+  document.body.appendChild(a);
   a.click();
-
+  a.remove();
   URL.revokeObjectURL(url);
 }
 
-/* ===== INIT ===== */
-const makeI = document.getElementById("make");
-const yearI = document.getElementById("year");
-const cameraI = document.getElementById("camera");
-const colorI = document.getElementById("color");
-const searchI = document.getElementById("search");
-const list = document.getElementById("list");
+function exportJson(){
+  const arr = load();
+  const blob = new Blob([JSON.stringify(arr, null, 2)], {type:"application/json"});
+  downloadBlob(blob, `car-database_${new Date().toISOString().slice(0,10)}.json`);
+}
 
+function exportCsv(){
+  const arr = load();
+  const header = ["Make","Year","Camera reading","Color code","Created"];
+  const lines = [header.join(",")];
+
+  arr.forEach(x => {
+    const row = [
+      x.make, x.year, x.camera, x.color, x.createdAt || ""
+    ].map(v => `"${String(v ?? "").replaceAll('"','""')}"`);
+    lines.push(row.join(","));
+  });
+
+  const blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8"});
+  downloadBlob(blob, `car-database_${new Date().toISOString().slice(0,10)}.csv`);
+}
+
+function importJson(){
+  const inp = document.createElement("input");
+  inp.type = "file";
+  inp.accept = ".json,application/json";
+  inp.onchange = async () => {
+    const file = inp.files?.[0];
+    if(!file) return;
+    const text = await file.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch { return alert("Invalid JSON file."); }
+
+    if(!Array.isArray(data)) return alert("JSON must be an array.");
+    // quick shape check
+    const cleaned = data
+      .filter(x => x && typeof x === "object")
+      .map(x => ({
+        make: normUpper(x.make),
+        year: normalize(x.year),
+        camera: normalize(x.camera),
+        color: normUpper(x.color),
+        createdAt: x.createdAt || new Date().toISOString()
+      }))
+      .filter(x => x.make && x.year && x.camera && x.color);
+
+    if(!cleaned.length) return alert("No valid records found in the file.");
+
+    if(!confirm(`Import ${cleaned.length} records? This will MERGE with current records.`)) return;
+
+    const current = load();
+    const merged = [...cleaned, ...current];
+
+    // remove exact duplicates by signature
+    const seen = new Set();
+    const unique = [];
+    for(const x of merged){
+      const sig = `${x.make}|${x.year}|${x.camera}|${x.color}`;
+      if(seen.has(sig)) continue;
+      seen.add(sig);
+      unique.push(x);
+    }
+
+    saveAll(unique);
+    render();
+    alert("Import done.");
+  };
+  inp.click();
+}
+
+/* ===== Print / PDF ===== */
+function printPdf(){
+  // You can choose "Save as PDF" in the printer dialog
+  window.print();
+}
+
+/* ===== Events ===== */
+$("btnSave").addEventListener("click", addEntry);
+$("btnClear").addEventListener("click", clearForm);
+$("q").addEventListener("input", render);
+
+$("btnExportJson").addEventListener("click", exportJson);
+$("btnExportCsv").addEventListener("click", exportCsv);
+$("btnImportJson").addEventListener("click", importJson);
+$("btnPrint").addEventListener("click", printPdf);
+
+// Enter key = Save
+["make","year","camera","color"].forEach(id=>{
+  $(id).addEventListener("keydown", (e)=>{
+    if(e.key === "Enter") addEntry();
+  });
+});
+
+/* ===== Start ===== */
 render();
 
-/* ===== OFFLINE ===== */
-if("serviceWorker" in navigator){
+/* ===== Offline (Service Worker) ===== */
+if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js");
 }
 </script>
+
+<!-- Print style -->
+<style>
+@media print{
+  body{background:#fff;color:#000}
+  header,.hint,.small,.topbar,.row{display:none !important}
+  .card{border:none}
+  table{font-size:12px}
+  th{background:#eee !important;color:#000}
+}
+</style>
 
 </body>
 </html>
