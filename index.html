@@ -15,10 +15,15 @@
     input,button{width:100%;padding:10px;margin:5px 0;font-size:16px}
     button{background:#2ecc71;border:none;font-weight:bold;cursor:pointer}
     .danger{background:#e74c3c}
+    .blue{background:#3b82f6}
+    .gray{background:#444}
     table{width:100%;border-collapse:collapse;margin-top:10px}
-    th,td{border:1px solid #444;padding:6px}
+    th,td{border:1px solid #444;padding:6px;vertical-align:top}
     th{background:#222}
     tr:hover{background:#333}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    .row button{flex:1;min-width:160px}
+    .small{font-size:13px;color:#bbb;margin-top:6px}
   </style>
 </head>
 <body>
@@ -37,6 +42,16 @@
 
   <input id="q" placeholder="Search..." oninput="render()">
 
+  <!-- EXPORT + PRINT -->
+  <div class="row">
+    <button class="blue" onclick="exportCSV()">Export CSV</button>
+    <button class="blue" onclick="exportJSON()">Export JSON (backup)</button>
+    <button class="gray" onclick="printPDF()">Print / Save as PDF</button>
+  </div>
+  <div class="small">
+    Tip: For PDF choose printer: <b>Save as PDF</b> in the print window.
+  </div>
+
   <table>
     <thead>
       <tr>
@@ -53,7 +68,7 @@
 
 <script>
 /* ===== DATABASE ===== */
-const KEY = "car_db_4fields_v1";
+const KEY = "car_db_4fields_v2";
 const load = () => JSON.parse(localStorage.getItem(KEY) || "[]");
 const save = d => localStorage.setItem(KEY, JSON.stringify(d));
 
@@ -74,13 +89,7 @@ function add(){
   }
 
   const d = load();
-  d.unshift({
-    id: uid(),
-    make: makeV,
-    year: yearV,
-    camera: camV,
-    color: colorV
-  });
+  d.unshift({ id: uid(), make: makeV, year: yearV, camera: camV, color: colorV });
   save(d);
 
   makeI.value = yearI.value = cameraI.value = colorI.value = "";
@@ -111,26 +120,152 @@ function edit(id){
   render();
 }
 
+/* ===== FILTERED DATA (based on search box) ===== */
+function getFiltered(){
+  const q = U(qI.value);
+  const data = load();
+  if(!q) return data;
+  return data.filter(x => `${x.make} ${x.year} ${x.camera} ${x.color}`.includes(q));
+}
+
 /* ===== RENDER ===== */
 function render(){
-  const q = U(qI.value);
+  const data = getFiltered();
   list.innerHTML = "";
+  data.forEach(x => {
+    list.innerHTML += `
+      <tr>
+        <td>${escapeHtml(x.make)}</td>
+        <td>${escapeHtml(x.year)}</td>
+        <td>${escapeHtml(x.camera)}</td>
+        <td>${escapeHtml(x.color)}</td>
+        <td>
+          <button onclick="edit('${x.id}')">Edit</button>
+          <button class="danger" onclick="del('${x.id}')">Delete</button>
+        </td>
+      </tr>`;
+  });
+}
 
-  load()
-    .filter(x => !q || `${x.make} ${x.year} ${x.camera} ${x.color}`.includes(q))
-    .forEach(x => {
-      list.innerHTML += `
+/* ===== EXPORT CSV ===== */
+function exportCSV(){
+  const data = getFiltered();
+  if(data.length === 0) return alert("Nothing to export.");
+
+  const header = ["Make","Year","Camera reading","Color code"];
+  const lines = [header.join(",")];
+
+  data.forEach(x => {
+    lines.push([
+      csvCell(x.make),
+      csvCell(x.year),
+      csvCell(x.camera),
+      csvCell(x.color)
+    ].join(","));
+  });
+
+  const csv = lines.join("\n");
+  downloadFile(csv, fileName("car-database", "csv"), "text/csv;charset=utf-8");
+}
+
+/* ===== EXPORT JSON (backup) ===== */
+function exportJSON(){
+  const data = getFiltered();
+  if(data.length === 0) return alert("Nothing to export.");
+
+  const json = JSON.stringify(data, null, 2);
+  downloadFile(json, fileName("car-database-backup", "json"), "application/json;charset=utf-8");
+}
+
+/* ===== PRINT / SAVE AS PDF ===== */
+function printPDF(){
+  const data = getFiltered();
+
+  const rows = data.map(x => `
+    <tr>
+      <td>${escapeHtml(x.make)}</td>
+      <td>${escapeHtml(x.year)}</td>
+      <td>${escapeHtml(x.camera)}</td>
+      <td>${escapeHtml(x.color)}</td>
+    </tr>`).join("");
+
+  const html = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <title>Car Database - Print</title>
+    <style>
+      body{font-family:Arial;margin:24px;color:#111}
+      h2{margin:0 0 10px 0}
+      .meta{color:#555;margin-bottom:14px;font-size:12px}
+      table{width:100%;border-collapse:collapse}
+      th,td{border:1px solid #999;padding:8px;text-align:left;vertical-align:top}
+      th{background:#eee}
+      @page { margin: 14mm; }
+    </style>
+  </head>
+  <body>
+    <h2>Car Database</h2>
+    <div class="meta">
+      Exported: ${new Date().toLocaleString()}<br>
+      Search filter: ${escapeHtml(qI.value || "(none)")}
+    </div>
+    <table>
+      <thead>
         <tr>
-          <td>${x.make}</td>
-          <td>${x.year}</td>
-          <td>${x.camera}</td>
-          <td>${x.color}</td>
-          <td>
-            <button onclick="edit('${x.id}')">Edit</button>
-            <button class="danger" onclick="del('${x.id}')">Delete</button>
-          </td>
-        </tr>`;
-    });
+          <th>Make</th><th>Year</th><th>Camera reading</th><th>Color code</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows || `<tr><td colspan="4">No records</td></tr>`}
+      </tbody>
+    </table>
+    <script>
+      window.onload = () => window.print();
+    <\/script>
+  </body>
+  </html>`;
+
+  const w = window.open("", "_blank");
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+/* ===== HELPERS ===== */
+function downloadFile(content, filename, mime){
+  const blob = new Blob([content], {type: mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function fileName(base, ext){
+  const d = new Date();
+  const pad = n => String(n).padStart(2,"0");
+  const stamp = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+  return `${base}_${stamp}.${ext}`;
+}
+
+function csvCell(v){
+  const s = String(v ?? "");
+  // Escape quotes and wrap in quotes
+  return `"${s.replace(/"/g,'""')}"`;
+}
+
+function escapeHtml(str){
+  return String(str ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
 }
 
 /* ===== START ===== */
