@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Baza aut – offline</title>
 
-  <!-- PWA -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#111111">
 
@@ -14,7 +13,7 @@
     h1{text-align:center;margin:10px 0}
     .box{padding:10px}
     input,button{width:100%;padding:10px;margin:5px 0;font-size:16px}
-    button{background:#2ecc71;border:none;font-weight:bold}
+    button{background:#2ecc71;border:none;font-weight:bold;cursor:pointer}
     .danger{background:#e74c3c}
     table{width:100%;border-collapse:collapse;margin-top:10px}
     th,td{border:1px solid #444;padding:6px}
@@ -27,10 +26,10 @@
 <h1>🚗 Baza aut</h1>
 
 <div class="box">
-  <input id="vin" placeholder="VIN">
   <input id="marka" placeholder="Marka">
   <input id="rok" placeholder="Rocznik">
   <input id="kolor" placeholder="Kod koloru">
+
   <button onclick="add()">Zapisz</button>
 
   <input id="q" placeholder="Szukaj..." oninput="render()">
@@ -38,7 +37,10 @@
   <table>
     <thead>
       <tr>
-        <th>VIN</th><th>Marka</th><th>Rok</th><th>Kod</th><th>Akcja</th>
+        <th>Marka</th>
+        <th>Rok</th>
+        <th>Kod koloru</th>
+        <th>Akcja</th>
       </tr>
     </thead>
     <tbody id="list"></tbody>
@@ -46,73 +48,88 @@
 </div>
 
 <script>
-/* ====== LOGIKA APLIKACJI ====== */
-const KEY="baza_aut_full";
+/* ===== BAZA (BEZ VIN) ===== */
+const KEY = "baza_aut_no_vin_v1";
 
-const load=()=>JSON.parse(localStorage.getItem(KEY)||"[]");
-const save=d=>localStorage.setItem(KEY,JSON.stringify(d));
-const N=v=>(v||"").trim().toUpperCase();
-const NV=v=>N(v).replace(/\s+/g,"");
+const load = () => JSON.parse(localStorage.getItem(KEY) || "[]");
+const save = d => localStorage.setItem(KEY, JSON.stringify(d));
 
+const N = v => (v || "").trim().toUpperCase();
+const T = v => (v || "").trim();
+
+const uid = () =>
+  Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+
+/* ===== DODAJ ===== */
 function add(){
-  const vin=NV(vinI.value),
-        marka=N(markaI.value),
-        rok=rokI.value.trim(),
-        kolor=N(kolorI.value);
-  if(!vin||!marka||!rok||!kolor) return alert("Uzupełnij wszystkie pola");
+  const marka = N(markaI.value);
+  const rok   = T(rokI.value);
+  const kolor = N(kolorI.value);
 
-  const d=load();
-  if(d.some(x=>x.vin===vin)) return alert("VIN już istnieje");
+  if(!marka || !rok || !kolor){
+    alert("Uzupełnij wszystkie pola");
+    return;
+  }
 
-  d.unshift({vin,marka,rok,kolor});
+  const d = load();
+  d.unshift({ id: uid(), marka, rok, kolor });
   save(d);
-  vinI.value=markaI.value=rokI.value=kolorI.value="";
+
+  markaI.value = rokI.value = kolorI.value = "";
   render();
 }
 
-function del(v){
-  if(!confirm("Usunąć wpis?"))return;
-  save(load().filter(x=>x.vin!==v));
+/* ===== USUŃ ===== */
+function del(id){
+  if(!confirm("Usunąć wpis?")) return;
+  save(load().filter(x => x.id !== id));
   render();
 }
 
-function edit(v){
-  const d=load(),x=d.find(a=>a.vin===v);
-  if(!x)return;
-  const nv=NV(prompt("VIN",x.vin)),
-        nm=N(prompt("Marka",x.marka)),
-        nr=prompt("Rok",x.rok),
-        nk=N(prompt("Kod koloru",x.kolor));
-  if(!nv||!nm||!nr||!nk)return;
-  if(nv!==v && d.some(a=>a.vin===nv))return alert("VIN już istnieje");
-  Object.assign(x,{vin:nv,marka:nm,rok:nr,kolor:nk});
-  save(d); render();
+/* ===== EDYTUJ ===== */
+function edit(id){
+  const d = load();
+  const x = d.find(a => a.id === id);
+  if(!x) return;
+
+  const nm = N(prompt("Marka", x.marka));
+  const nr = prompt("Rok", x.rok);
+  const nk = N(prompt("Kod koloru", x.kolor));
+
+  if(!nm || !nr || !nk) return;
+
+  Object.assign(x, { marka: nm, rok: nr.trim(), kolor: nk });
+  save(d);
+  render();
 }
 
+/* ===== WYSZUKIWANIE + RENDER ===== */
 function render(){
-  const q=N(qI.value);
-  list.innerHTML="";
-  load().filter(x=>
-    !q || `${x.vin} ${x.marka} ${x.rok} ${x.kolor}`.includes(q)
-  ).forEach(x=>{
-    list.innerHTML+=`
-      <tr>
-        <td>${x.vin}</td><td>${x.marka}</td>
-        <td>${x.rok}</td><td>${x.kolor}</td>
-        <td>
-          <button onclick="edit('${x.vin}')">Edytuj</button>
-          <button class="danger" onclick="del('${x.vin}')">Usuń</button>
-        </td>
-      </tr>`;
-  });
+  const q = N(qI.value);
+  list.innerHTML = "";
+
+  load()
+    .filter(x => !q || `${x.marka} ${x.rok} ${x.kolor}`.includes(q))
+    .forEach(x => {
+      list.innerHTML += `
+        <tr>
+          <td>${x.marka}</td>
+          <td>${x.rok}</td>
+          <td>${x.kolor}</td>
+          <td>
+            <button onclick="edit('${x.id}')">Edytuj</button>
+            <button class="danger" onclick="del('${x.id}')">Usuń</button>
+          </td>
+        </tr>`;
+    });
 }
 
-/* ====== START ====== */
-const vinI=vin,markaI=marka,rokI=rok,kolorI=kolor,qI=q;
+/* ===== START ===== */
+const markaI = marka, rokI = rok, kolorI = kolor, qI = q;
 render();
 
-/* ====== OFFLINE (SERVICE WORKER) ====== */
-if("serviceWorker"in navigator){
+/* ===== OFFLINE ===== */
+if("serviceWorker" in navigator){
   navigator.serviceWorker.register("sw.js");
 }
 </script>
